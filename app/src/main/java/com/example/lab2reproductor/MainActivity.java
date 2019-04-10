@@ -13,6 +13,8 @@ import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
+import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.ListView;
@@ -33,13 +35,13 @@ public class MainActivity extends AppCompatActivity {
     AudioManager audioManager;
     Button btnPlayPause;
     boolean isActivePlaying;
+    int idCancionActual;
+    String [][] listaCanciones;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
-
 
         String[][] listaidCanciones=obtenerCanciones();
 
@@ -55,9 +57,40 @@ public class MainActivity extends AppCompatActivity {
         Random r=new Random();
         int numeroCancion=r.nextInt(listaCanciones.length);
         mediaPlayer = MediaPlayer.create(this, getResources().getIdentifier("com.example.lab2reproductor:raw/"+listaCanciones[numeroCancion][1], null,null));
+        idCancionActual= numeroCancion;
         cambiarCancionArtista(listaCanciones[numeroCancion][2],listaCanciones[numeroCancion][3]);
 
         inicializarBarraReproduccionVolumen();
+    }
+
+    public void siguienteCancion(){
+        if(listaCanciones.length<=idCancionActual+1)
+            reproducirCancion(0);
+        else
+            reproducirCancion(idCancionActual+1);
+    }
+
+    public void anteriorCancion(){
+        if(idCancionActual-1>=0)
+            reproducirCancion(idCancionActual-1);
+        else
+            reproducirCancion(listaCanciones.length-1);
+    }
+
+    public void reproducirCancion(int id){
+        if(listaCanciones!=null) {
+            mediaPlayer.stop();
+            mediaPlayer = MediaPlayer.create(this, getResources().getIdentifier("com.example.lab2reproductor:raw/" + listaCanciones[id][1], null, null));
+            idCancionActual = id;
+            cambiarCancionArtista(listaCanciones[id][2], listaCanciones[id][3]);
+
+            inicializarBarraReproduccionVolumen();
+            mediaPlayer.start();
+            isActivePlaying = true;
+            btnPlayPause.setBackgroundResource(android.R.drawable.ic_media_pause);
+        }
+        else
+            Toast.makeText(this,"ERROR: no se encontraron canciones disponibles",Toast.LENGTH_LONG).show();
     }
 
     public void cambiarCancionArtista(String nombreCancion, String nombreArtista){
@@ -96,7 +129,7 @@ public class MainActivity extends AppCompatActivity {
 
         // Manejo de avance
         final SeekBar advanceSeekbar = findViewById(R.id.advanceSeekBar);
-        int duration = mediaPlayer.getDuration();
+        final int duration = mediaPlayer.getDuration();
         int progress = mediaPlayer.getCurrentPosition();
         advanceSeekbar.setMax(duration);
         advanceSeekbar.setProgress(progress);
@@ -106,8 +139,15 @@ public class MainActivity extends AppCompatActivity {
             public void onProgressChanged(SeekBar seekBar, int i, boolean b) {
                 if(b)
                     mediaPlayer.seekTo(i);
+
+
                 //TODO agregar duracion total de la cancion
                 //TODO mostrar el tiempo actual de la cancion
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+
             }
 
             @Override
@@ -115,12 +155,14 @@ public class MainActivity extends AppCompatActivity {
 
             }
 
-            @Override
-            public void onStopTrackingTouch(SeekBar seekBar) {
-
-            }
         });
 
+        mediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
+            @Override
+            public void onCompletion(MediaPlayer mp) {
+                siguienteCancion();
+            }
+        });
 
         new Timer().scheduleAtFixedRate(new TimerTask() {
                                             @Override
@@ -138,8 +180,8 @@ public class MainActivity extends AppCompatActivity {
         if(idCanciones!=null) {
             ListView listaCanciones = findViewById(R.id.listCanciones);
 
-            ArrayList canciones = new ArrayList();
-            ArrayList artistas = new ArrayList();
+            final ArrayList canciones = new ArrayList();
+            final ArrayList artistas = new ArrayList();
 
             int i=0;
             for (String[] id : idCanciones) {
@@ -176,14 +218,33 @@ public class MainActivity extends AppCompatActivity {
                 i++;
             }
 
-            //TODO mostrar el artista
-            ArrayAdapter adapter = new ArrayAdapter(this, android.R.layout.simple_list_item_1, canciones);
+            ArrayAdapter adapter = new ArrayAdapter(this, android.R.layout.simple_list_item_2, android.R.id.text1, canciones) {
+                @Override
+                public View getView(int position, View convertView, ViewGroup parent) {
+                    View view = super.getView(position, convertView, parent);
+                    TextView text1 = (TextView) view.findViewById(android.R.id.text1);
+                    TextView text2 = (TextView) view.findViewById(android.R.id.text2);
+
+                    text1.setText(canciones.get(position).toString());
+                    text2.setText(artistas.get(position).toString());
+                    return view;
+                }
+            };
             listaCanciones.setAdapter(adapter);
+
+            listaCanciones.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+                @Override
+                public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                    reproducirCancion(position);
+                }
+            });
         }
         else
             Toast.makeText(this,"No se encontraron canciones",Toast.LENGTH_LONG).show();
+        listaCanciones=ResCanciones;
         return ResCanciones;
     }
+
 
     public String[][] obtenerCanciones(){
         Field[] ID_Fields = R.raw.class.getFields();
@@ -212,5 +273,13 @@ public class MainActivity extends AppCompatActivity {
             isActivePlaying=true;
             btnPlayPause.setBackgroundResource(android.R.drawable.ic_media_pause);
         }
+    }
+
+    public void btnAnterior(View view) {
+        anteriorCancion();
+    }
+
+    public void btnSiguiente(View view) {
+        siguienteCancion();
     }
 }
